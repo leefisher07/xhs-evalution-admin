@@ -1,6 +1,8 @@
 import { Suspense } from 'react';
 import { fetchDashboardData } from '@/lib/services/dashboard';
 
+export const dynamic = 'force-dynamic';
+
 async function DashboardContent() {
   const data = await fetchDashboardData();
 
