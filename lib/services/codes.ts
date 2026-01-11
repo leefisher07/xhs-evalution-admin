@@ -1,4 +1,4 @@
-import { createAdminClient } from '@/lib/supabase/server';
+import { getDbPool } from '@/lib/supabase/server';
 import { deriveCodeStatus, generatePlainCode, hashCode } from '@/lib/codes';
 import { BULK_GENERATION_LIMIT, UNLIMITED_MAX_USES } from '@/lib/constants/codes';
 import type { AccessCode } from '@/types/database';
@@ -40,46 +40,70 @@ function mapToUi(code: AccessCode): UiCode {
  * 获取验证码列表（带分页和过滤）
  */
 export async function listCodes(filters: CodeFilters = {}): Promise<CodeListResponse> {
+  const pool = getDbPool();
   const page = Math.max(1, filters.page ?? 1);
   const pageSize = Math.min(50, filters.pageSize ?? DEFAULT_PAGE_SIZE);
-  const from = (page - 1) * pageSize;
-  const to = from + pageSize - 1;
+  const offset = (page - 1) * pageSize;
 
-  const supabase = createAdminClient();
+  const conditions: string[] = [];
+  const params: any[] = [];
+  let paramIndex = 1;
 
-  const buildQuery = () => {
-    let query = supabase.from('access_codes').select('*', { count: 'exact' }).order('created_at', { ascending: false });
-    if (filters.search) {
-      const searchTerm = `%${filters.search}%`;
-      query = query.ilike('description', searchTerm);
-    }
-    if (filters.expiresFrom) {
-      query = query.gte('expires_at', filters.expiresFrom);
-    }
-    if (filters.expiresTo) {
-      query = query.lte('expires_at', filters.expiresTo);
-    }
-    return query;
-  };
+  if (filters.search) {
+    conditions.push(`description ILIKE $${paramIndex}`);
+    params.push(`%${filters.search}%`);
+    paramIndex++;
+  }
+  if (filters.expiresFrom) {
+    conditions.push(`expires_at >= $${paramIndex}`);
+    params.push(filters.expiresFrom);
+    paramIndex++;
+  }
+  if (filters.expiresTo) {
+    conditions.push(`expires_at <= $${paramIndex}`);
+    params.push(filters.expiresTo);
+    paramIndex++;
+  }
+
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
   if (filters.status && filters.status !== 'all') {
-    const { data, error } = await buildQuery().limit(MAX_STATUS_FILTER_FETCH);
-    if (error) throw error;
-    const rows = ((data as AccessCode[]) ?? []).map(mapToUi).filter((code) => code.status === filters.status);
-    const sliced = rows.slice(from, to + 1);
+    const query = `
+      SELECT * FROM access_codes
+      ${whereClause}
+      ORDER BY created_at DESC
+      LIMIT $${paramIndex}
+    `;
+    params.push(MAX_STATUS_FILTER_FETCH);
+
+    const result = await pool.query<AccessCode>(query, params);
+    const rows = result.rows.map(mapToUi).filter((code) => code.status === filters.status);
+    const sliced = rows.slice(offset, offset + pageSize);
     return {
       items: sliced,
       total: rows.length
     };
   }
 
-  const { data, error, count } = await buildQuery().range(from, to);
-  if (error) throw error;
-  const items = ((data as AccessCode[]) ?? []).map(mapToUi);
+  const countQuery = `SELECT COUNT(*) FROM access_codes ${whereClause}`;
+  const dataQuery = `
+    SELECT * FROM access_codes
+    ${whereClause}
+    ORDER BY created_at DESC
+    LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+  `;
+  params.push(pageSize, offset);
+
+  const [countResult, dataResult] = await Promise.all([
+    pool.query(countQuery, params.slice(0, paramIndex - 1)),
+    pool.query<AccessCode>(dataQuery, params)
+  ]);
+
+  const items = dataResult.rows.map(mapToUi);
 
   return {
     items,
-    total: count ?? 0
+    total: parseInt(countResult.rows[0]?.count || '0', 10)
   };
 }
 
@@ -87,7 +111,7 @@ export async function listCodes(filters: CodeFilters = {}): Promise<CodeListResp
  * 创建验证码（随机生成或自定义）
  */
 export async function createCode(payload: CreateCodeInput): Promise<CreateCodeResult> {
-  const supabase = createAdminClient();
+  const pool = getDbPool();
   const expiresAtISO = new Date(payload.expiresAt).toISOString();
   const description = payload.description?.trim() || null;
   const maxUses = Number.isFinite(payload.maxUses) && payload.maxUses > 0 ? payload.maxUses : UNLIMITED_MAX_USES;
@@ -101,19 +125,14 @@ export async function createCode(payload: CreateCodeInput): Promise<CreateCodeRe
       throw new Error('验证码至少 6 位');
     }
     const codeHash = await hashCode(plain);
-    const { data, error } = await supabase
-      .from('access_codes')
-      .insert({
-        code_hash: codeHash,
-        plain_code: plain,
-        expires_at: expiresAtISO,
-        max_uses: maxUses,
-        description
-      })
-      .select('id, created_at')
-      .single();
-    if (error) throw error;
-    return { ids: [data.id], plainCodes: [plain], batchCreatedAt: data.created_at };
+    const query = `
+      INSERT INTO access_codes (code_hash, plain_code, expires_at, max_uses, description)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING id, created_at
+    `;
+    const result = await pool.query(query, [codeHash, plain, expiresAtISO, maxUses, description]);
+    const row = result.rows[0];
+    return { ids: [row.id], plainCodes: [plain], batchCreatedAt: row.created_at };
   }
 
   const quantity = Math.min(BULK_GENERATION_LIMIT, Math.max(1, payload.quantity ?? 1));
@@ -128,17 +147,24 @@ export async function createCode(payload: CreateCodeInput): Promise<CreateCodeRe
     }))
   );
 
-  const { data, error } = await supabase
-    .from('access_codes')
-    .insert(rows)
-    .select('id, created_at');
+  const values = rows.map((_, i) => {
+    const base = i * 5;
+    return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5})`;
+  }).join(', ');
 
-  if (error) throw error;
-  const inserted = (data as AccessCode[]) ?? [];
+  const params = rows.flatMap(r => [r.code_hash, r.plain_code, r.expires_at, r.max_uses, r.description]);
+
+  const query = `
+    INSERT INTO access_codes (code_hash, plain_code, expires_at, max_uses, description)
+    VALUES ${values}
+    RETURNING id, created_at
+  `;
+
+  const result = await pool.query(query, params);
   return {
-    ids: inserted.map((row) => row.id),
+    ids: result.rows.map((row) => row.id),
     plainCodes,
-    batchCreatedAt: inserted[0]?.created_at ?? new Date().toISOString()
+    batchCreatedAt: result.rows[0]?.created_at ?? new Date().toISOString()
   };
 }
 
@@ -146,46 +172,72 @@ export async function createCode(payload: CreateCodeInput): Promise<CreateCodeRe
  * 更新验证码信息
  */
 export async function updateCode(id: string, patch: UpdateCodeInput) {
-  const supabase = createAdminClient();
-  const { data, error } = await supabase
-    .from('access_codes')
-    .update({
-      expires_at: patch.expires_at ? new Date(patch.expires_at).toISOString() : undefined,
-      max_uses: patch.max_uses,
-      description: patch.description
-    })
-    .eq('id', id)
-    .select('*')
-    .single();
+  const pool = getDbPool();
+  const updates: string[] = [];
+  const params: any[] = [];
+  let paramIndex = 1;
 
-  if (error) throw error;
-  return mapToUi(data as AccessCode);
+  if (patch.expires_at) {
+    updates.push(`expires_at = $${paramIndex}`);
+    params.push(new Date(patch.expires_at).toISOString());
+    paramIndex++;
+  }
+  if (patch.max_uses !== undefined) {
+    updates.push(`max_uses = $${paramIndex}`);
+    params.push(patch.max_uses);
+    paramIndex++;
+  }
+  if (patch.description !== undefined) {
+    updates.push(`description = $${paramIndex}`);
+    params.push(patch.description);
+    paramIndex++;
+  }
+
+  if (updates.length === 0) {
+    throw new Error('No fields to update');
+  }
+
+  const query = `
+    UPDATE access_codes
+    SET ${updates.join(', ')}
+    WHERE id = $${paramIndex}
+    RETURNING *
+  `;
+  params.push(id);
+
+  const result = await pool.query<AccessCode>(query, params);
+  if (result.rows.length === 0) {
+    throw new Error('Code not found');
+  }
+  return mapToUi(result.rows[0]);
 }
 
 /**
  * 删除验证码
  */
 export async function deleteCode(id: string) {
-  const supabase = createAdminClient();
-  const { error } = await supabase.from('access_codes').delete().eq('id', id);
-  if (error) throw error;
+  const pool = getDbPool();
+  const query = 'DELETE FROM access_codes WHERE id = $1';
+  await pool.query(query, [id]);
 }
 
 /**
  * 获取最近的批次列表
  */
 export async function listRecentBatches(limit = 20): Promise<CodeBatchSummary[]> {
-  const supabase = createAdminClient();
+  const pool = getDbPool();
   const fetchLimit = limit * 20;
-  const { data, error } = await supabase
-    .from('access_codes')
-    .select('id, created_at')
-    .order('created_at', { ascending: false })
-    .limit(fetchLimit);
-  if (error) throw error;
+  const query = `
+    SELECT id, created_at
+    FROM access_codes
+    ORDER BY created_at DESC
+    LIMIT $1
+  `;
+
+  const result = await pool.query<AccessCode>(query, [fetchLimit]);
 
   const groups = new Map<string, CodeBatchSummary>();
-  (data as AccessCode[]).forEach((record) => {
+  result.rows.forEach((record) => {
     if (!record?.created_at) return;
     const key = record.created_at;
     const existing = groups.get(key);

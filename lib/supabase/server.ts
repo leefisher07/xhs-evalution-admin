@@ -1,22 +1,21 @@
-import { createClient } from '@supabase/supabase-js';
+import { Pool } from 'pg';
 import { ensureServerEnv } from '@/lib/env';
-import type { Database } from '@/types/supabase';
 
-let supabaseAdminClient: ReturnType<typeof createClient<Database>> | null = null;
+let pool: Pool | null = null;
 
-export function createAdminClient() {
-  if (supabaseAdminClient) {
-    return supabaseAdminClient;
+export function getDbPool() {
+  if (pool) {
+    return pool;
   }
 
-  const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = ensureServerEnv();
+  const { DATABASE_URL } = ensureServerEnv();
 
-  supabaseAdminClient = createClient<Database>(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
+  pool = new Pool({
+    connectionString: DATABASE_URL,
+    max: 20,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 2000,
   });
 
-  return supabaseAdminClient;
+  return pool;
 }
