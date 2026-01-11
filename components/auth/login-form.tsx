@@ -17,7 +17,7 @@ function SubmitButton() {
 }
 
 export function LoginForm() {
-  const [state, formAction] = useFormState(loginAction as any, undefined) as [
+  const [state, formAction] = useFormState(loginAction as any, undefined) as unknown as [
     LoginState | undefined,
     (payload: FormData) => void
   ];
