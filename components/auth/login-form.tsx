@@ -17,7 +17,7 @@ function SubmitButton() {
 }
 
 export function LoginForm() {
-  const [state, formAction] = useFormState<LoginState | void>(loginAction, undefined);
+  const [state, formAction] = useFormState(loginAction as any, undefined);
 
   return (
     <form action={formAction} className="mt-8 space-y-6">
