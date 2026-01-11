@@ -1,5 +1,5 @@
 import { subDays, addDays, formatISO, parseISO } from 'date-fns';
-import { createAdminClient } from '@/lib/supabase/server';
+import { getDbPool } from '@/lib/supabase/server';
 import { deriveCodeStatus } from '@/lib/codes';
 import { formatDisplayCode } from '@/lib/services/codes';
 import { UNLIMITED_MAX_USES } from '@/lib/constants/codes';
@@ -15,17 +15,18 @@ type EnrichedCode = AccessCode & {
  * 获取仪表盘数据（统计、趋势、最近记录等）
  */
 export async function fetchDashboardData(): Promise<DashboardPayload> {
-  const supabase = createAdminClient();
+  const pool = getDbPool();
   const now = new Date();
   const expiringThreshold = addDays(now, 7);
 
-  const { data, error } = await supabase
-    .from('access_codes')
-    .select('id, code_hash, plain_code, expires_at, used_count, max_uses, description, created_at')
-    .order('created_at', { ascending: false });
+  const query = `
+    SELECT id, code_hash, plain_code, expires_at, used_count, max_uses, description, created_at
+    FROM access_codes
+    ORDER BY created_at DESC
+  `;
 
-  if (error) throw error;
-  const rows = (data as AccessCode[]) ?? [];
+  const result = await pool.query<AccessCode>(query);
+  const rows = result.rows ?? [];
   const groupedByCreatedAt = rows.reduce<Record<string, AccessCode[]>>((acc, record) => {
     const key = record.created_at;
     if (!acc[key]) acc[key] = [];

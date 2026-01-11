@@ -1,6 +1,6 @@
 import { Buffer } from 'node:buffer';
 import ExcelJS from 'exceljs';
-import { createAdminClient } from '@/lib/supabase/server';
+import { getDbPool } from '@/lib/supabase/server';
 import { deriveCodeStatus } from '@/lib/codes';
 import { UNLIMITED_MAX_USES } from '@/lib/constants/codes';
 import type { AccessCode } from '@/types/database';
@@ -37,27 +37,39 @@ function formatDate(value: string) {
  * 构建验证码Excel工作簿
  */
 export async function buildCodesWorkbook(options: ExportOptions) {
-  const supabase = createAdminClient();
-  let query = supabase
-    .from('access_codes')
-    .select('*')
-    .order('created_at', { ascending: false });
+  const pool = getDbPool();
+
+  const conditions: string[] = [];
+  const params: any[] = [];
+  let paramIndex = 1;
 
   if (options.scope === 'batch' && options.batchKey) {
-    query = query.eq('created_at', options.batchKey);
+    conditions.push(`created_at = $${paramIndex}`);
+    params.push(options.batchKey);
+    paramIndex++;
   }
   if (options.scope === 'range') {
     if (options.rangeStart) {
-      query = query.gte('created_at', options.rangeStart);
+      conditions.push(`created_at >= $${paramIndex}`);
+      params.push(options.rangeStart);
+      paramIndex++;
     }
     if (options.rangeEnd) {
-      query = query.lte('created_at', options.rangeEnd);
+      conditions.push(`created_at <= $${paramIndex}`);
+      params.push(options.rangeEnd);
+      paramIndex++;
     }
   }
 
-  const { data, error } = await query;
-  if (error) throw error;
-  const enriched = ((data as AccessCode[]) ?? []).map((record) => ({
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  const query = `
+    SELECT * FROM access_codes
+    ${whereClause}
+    ORDER BY created_at DESC
+  `;
+
+  const result = await pool.query<AccessCode>(query, params);
+  const enriched = (result.rows ?? []).map((record) => ({
     ...record,
     status: deriveCodeStatus(record)
   }));
