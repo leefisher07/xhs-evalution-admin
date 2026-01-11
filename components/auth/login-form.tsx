@@ -17,7 +17,10 @@ function SubmitButton() {
 }
 
 export function LoginForm() {
-  const [state, formAction] = useFormState(loginAction as any, undefined);
+  const [state, formAction] = useFormState(loginAction as any, undefined) as [
+    LoginState | undefined,
+    (payload: FormData) => void
+  ];
 
   return (
     <form action={formAction} className="mt-8 space-y-6">
