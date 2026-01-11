@@ -1,4 +1,4 @@
-export type Database = {
+export interface Database {
   public: {
     Tables: {
       access_codes: {
@@ -32,7 +32,21 @@ export type Database = {
           description?: string | null;
           created_at?: string;
         };
+        Relationships: [];
       };
     };
+    Views: {
+      [_ in never]: never;
+    };
+    Functions: {
+      [_ in never]: never;
+    };
+    Enums: {
+      [_ in never]: never;
+    };
+    CompositeTypes: {
+      [_ in never]: never;
+    };
   };
-};
+}
+
