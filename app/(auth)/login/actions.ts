@@ -32,7 +32,7 @@ export async function loginAction(
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
     maxAge: ADMIN_SESSION_MAX_AGE,
-    path: '/'
+    path: '/xhs-admin'
   });
 
   redirect(redirectTo);
