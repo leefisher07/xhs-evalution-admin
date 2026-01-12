@@ -35,10 +35,11 @@ export function LoginForm() {
     if (state?.success && state?.redirectTo && !hasRedirected.current) {
       hasRedirected.current = true;
       console.log('[LoginForm] Login successful, redirecting to:', state.redirectTo);
-      // Use router.push to handle basePath automatically
-      router.push(state.redirectTo);
+      // Use window.location.href with basePath for reliable redirect
+      const basePath = '/xhs-admin';
+      window.location.href = basePath + state.redirectTo;
     }
-  }, [state, router]);
+  }, [state]);
 
   return (
     <form action={formAction} className="mt-8 space-y-6">
