@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFormState, useFormStatus } from 'react-dom';
 import { useSearchParams } from 'next/navigation';
@@ -23,6 +23,7 @@ export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('redirectTo') || '/dashboard';
+  const hasRedirected = useRef(false);
 
   const [state, formAction] = useFormState(loginAction as any, undefined) as unknown as [
     LoginState | undefined,
@@ -31,14 +32,11 @@ export function LoginForm() {
 
   // Handle client-side redirect on successful login
   useEffect(() => {
-    if (state?.success && state?.redirectTo) {
+    if (state?.success && state?.redirectTo && !hasRedirected.current) {
+      hasRedirected.current = true;
       console.log('[LoginForm] Login successful, redirecting to:', state.redirectTo);
-      // Use router.push to handle basePath automatically, then refresh to ensure cookies are set
+      // Use router.push to handle basePath automatically
       router.push(state.redirectTo);
-      // Force a hard refresh after navigation to ensure cookies are properly applied
-      setTimeout(() => {
-        router.refresh();
-      }, 100);
     }
   }, [state, router]);
 
