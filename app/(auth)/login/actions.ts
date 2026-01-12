@@ -27,6 +27,14 @@ export async function loginAction(
 
   const cookieStore = cookies();
   const token = await createSessionToken();
+
+  console.log('[Login Action] Setting session cookie:', {
+    token: token.substring(0, 10) + '...',
+    path: '/',
+    maxAge: ADMIN_SESSION_MAX_AGE,
+    redirectTo
+  });
+
   cookieStore.set(ADMIN_SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: 'lax',
@@ -35,5 +43,6 @@ export async function loginAction(
     path: '/'
   });
 
+  console.log('[Login Action] Cookie set, redirecting to:', redirectTo);
   redirect(redirectTo);
 }

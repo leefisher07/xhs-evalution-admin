@@ -14,7 +14,19 @@ export async function middleware(req: NextRequest) {
   const isProtected = PROTECTED_PREFIXES.some((prefix) => pathname.startsWith(prefix));
   const isAuthRoute = pathname.startsWith(AUTH_PREFIX);
 
+  // Debug logging (enabled in both dev and production for troubleshooting)
+  console.log('[Middleware]', {
+    pathname,
+    hasToken: !!token,
+    tokenPreview: token?.substring(0, 10),
+    hasSession,
+    isProtected,
+    isAuthRoute,
+    cookieCount: req.cookies.getAll().length
+  });
+
   if (isProtected && !hasSession) {
+    console.log('[Middleware] Redirecting to login - no valid session');
     const redirectUrl = req.nextUrl.clone();
     redirectUrl.pathname = '/login';
     redirectUrl.searchParams.set('redirectTo', pathname);
@@ -22,6 +34,7 @@ export async function middleware(req: NextRequest) {
   }
 
   if (isAuthRoute && hasSession) {
+    console.log('[Middleware] Redirecting to dashboard - already logged in');
     const redirectUrl = req.nextUrl.clone();
     redirectUrl.pathname = '/dashboard';
     redirectUrl.searchParams.delete('redirectTo');

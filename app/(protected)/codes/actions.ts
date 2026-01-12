@@ -21,20 +21,26 @@ export async function getCodesAction(filters?: CodeFilters) {
  * Server Action: 创建验证码
  */
 export async function createCodeAction(input: CreateCodeInput) {
+  console.log('[createCodeAction] Called with input:', input);
   try {
     const result = await createCode(input);
+    console.log('[createCodeAction] Success, created:', result.plainCodes?.length || 1, 'codes');
     revalidatePath('/codes');
     revalidatePath('/dashboard'); // 刷新仪表盘数据
-    return {
+    const response = {
       success: true,
       data: result,
       message: input.mode === 'random'
         ? `成功生成 ${result.plainCodes.length} 个验证码`
         : '验证码创建成功'
     };
+    console.log('[createCodeAction] Returning response:', response);
+    return response;
   } catch (error: any) {
-    console.error('Failed to create code:', error);
-    return { success: false, error: error.message || '创建验证码失败' };
+    console.error('[createCodeAction] Error:', error);
+    const errorResponse = { success: false, error: error.message || '创建验证码失败' };
+    console.log('[createCodeAction] Returning error response:', errorResponse);
+    return errorResponse;
   }
 }
 
@@ -42,14 +48,20 @@ export async function createCodeAction(input: CreateCodeInput) {
  * Server Action: 更新验证码
  */
 export async function updateCodeAction(id: string, patch: UpdateCodeInput) {
+  console.log('[updateCodeAction] Called with id:', id, 'patch:', patch);
   try {
     await updateCode(id, patch);
+    console.log('[updateCodeAction] Success');
     revalidatePath('/codes');
     revalidatePath('/dashboard'); // 刷新仪表盘数据
-    return { success: true, message: '验证码更新成功' };
+    const response = { success: true, message: '验证码更新成功' };
+    console.log('[updateCodeAction] Returning response:', response);
+    return response;
   } catch (error: any) {
-    console.error('Failed to update code:', error);
-    return { success: false, error: error.message || '更新验证码失败' };
+    console.error('[updateCodeAction] Error:', error);
+    const errorResponse = { success: false, error: error.message || '更新验证码失败' };
+    console.log('[updateCodeAction] Returning error response:', errorResponse);
+    return errorResponse;
   }
 }
 
