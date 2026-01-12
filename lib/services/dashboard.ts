@@ -28,8 +28,8 @@ export async function fetchDashboardData(): Promise<DashboardPayload> {
   const result = await pool.query<AccessCode>(query);
   const rows = (result.rows ?? []).map(row => ({
     ...row,
-    expires_at: typeof row.expires_at === 'string' ? row.expires_at : row.expires_at.toISOString(),
-    created_at: typeof row.created_at === 'string' ? row.created_at : row.created_at.toISOString()
+    expires_at: typeof row.expires_at === 'string' ? row.expires_at : (row.expires_at as Date).toISOString(),
+    created_at: typeof row.created_at === 'string' ? row.created_at : (row.created_at as Date).toISOString()
   }));
   const groupedByCreatedAt = rows.reduce<Record<string, AccessCode[]>>((acc, record) => {
     const key = record.created_at;
