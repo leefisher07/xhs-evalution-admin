@@ -77,7 +77,12 @@ export async function listCodes(filters: CodeFilters = {}): Promise<CodeListResp
     params.push(MAX_STATUS_FILTER_FETCH);
 
     const result = await pool.query<AccessCode>(query, params);
-    const rows = result.rows.map(mapToUi).filter((code) => code.status === filters.status);
+    const normalizedRows = result.rows.map(row => ({
+      ...row,
+      expires_at: typeof row.expires_at === 'string' ? row.expires_at : row.expires_at.toISOString(),
+      created_at: typeof row.created_at === 'string' ? row.created_at : row.created_at.toISOString()
+    }));
+    const rows = normalizedRows.map(mapToUi).filter((code) => code.status === filters.status);
     const sliced = rows.slice(offset, offset + pageSize);
     return {
       items: sliced,
@@ -99,7 +104,12 @@ export async function listCodes(filters: CodeFilters = {}): Promise<CodeListResp
     pool.query<AccessCode>(dataQuery, params)
   ]);
 
-  const items = dataResult.rows.map(mapToUi);
+  const normalizedRows = dataResult.rows.map(row => ({
+    ...row,
+    expires_at: typeof row.expires_at === 'string' ? row.expires_at : row.expires_at.toISOString(),
+    created_at: typeof row.created_at === 'string' ? row.created_at : row.created_at.toISOString()
+  }));
+  const items = normalizedRows.map(mapToUi);
 
   return {
     items,
@@ -132,7 +142,8 @@ export async function createCode(payload: CreateCodeInput): Promise<CreateCodeRe
     `;
     const result = await pool.query(query, [codeHash, plain, expiresAtISO, maxUses, description]);
     const row = result.rows[0];
-    return { ids: [row.id], plainCodes: [plain], batchCreatedAt: row.created_at };
+    const normalizedCreatedAt = typeof row.created_at === 'string' ? row.created_at : row.created_at.toISOString();
+    return { ids: [row.id], plainCodes: [plain], batchCreatedAt: normalizedCreatedAt };
   }
 
   const quantity = Math.min(BULK_GENERATION_LIMIT, Math.max(1, payload.quantity ?? 1));
@@ -161,10 +172,15 @@ export async function createCode(payload: CreateCodeInput): Promise<CreateCodeRe
   `;
 
   const result = await pool.query(query, params);
+  const firstRow = result.rows[0];
+  const normalizedCreatedAt = firstRow && typeof firstRow.created_at === 'string'
+    ? firstRow.created_at
+    : firstRow?.created_at.toISOString() ?? new Date().toISOString();
+
   return {
     ids: result.rows.map((row) => row.id),
     plainCodes,
-    batchCreatedAt: result.rows[0]?.created_at ?? new Date().toISOString()
+    batchCreatedAt: normalizedCreatedAt
   };
 }
 
@@ -209,7 +225,13 @@ export async function updateCode(id: string, patch: UpdateCodeInput) {
   if (result.rows.length === 0) {
     throw new Error('Code not found');
   }
-  return mapToUi(result.rows[0]);
+  const row = result.rows[0];
+  const normalizedRow = {
+    ...row,
+    expires_at: typeof row.expires_at === 'string' ? row.expires_at : row.expires_at.toISOString(),
+    created_at: typeof row.created_at === 'string' ? row.created_at : row.created_at.toISOString()
+  };
+  return mapToUi(normalizedRow);
 }
 
 /**
@@ -239,7 +261,10 @@ export async function listRecentBatches(limit = 20): Promise<CodeBatchSummary[]>
   const groups = new Map<string, CodeBatchSummary>();
   result.rows.forEach((record) => {
     if (!record?.created_at) return;
-    const key = record.created_at;
+    const normalizedCreatedAt = typeof record.created_at === 'string'
+      ? record.created_at
+      : record.created_at.toISOString();
+    const key = normalizedCreatedAt;
     const existing = groups.get(key);
     if (existing) {
       existing.count += 1;

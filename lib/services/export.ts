@@ -71,6 +71,8 @@ export async function buildCodesWorkbook(options: ExportOptions) {
   const result = await pool.query<AccessCode>(query, params);
   const enriched = (result.rows ?? []).map((record) => ({
     ...record,
+    expires_at: typeof record.expires_at === 'string' ? record.expires_at : record.expires_at.toISOString(),
+    created_at: typeof record.created_at === 'string' ? record.created_at : record.created_at.toISOString(),
     status: deriveCodeStatus(record)
   }));
 
