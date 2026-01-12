@@ -1,7 +1,5 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
 import { useFormState, useFormStatus } from 'react-dom';
 import { useSearchParams } from 'next/navigation';
 import { loginAction, type LoginState } from '@/app/(auth)/login/actions';
@@ -20,26 +18,13 @@ function SubmitButton() {
 }
 
 export function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('redirectTo') || '/dashboard';
-  const hasRedirected = useRef(false);
 
   const [state, formAction] = useFormState(loginAction as any, undefined) as unknown as [
     LoginState | undefined,
     (payload: FormData) => void
   ];
-
-  // Handle client-side redirect on successful login
-  useEffect(() => {
-    if (state?.success && state?.redirectTo && !hasRedirected.current) {
-      hasRedirected.current = true;
-      console.log('[LoginForm] Login successful, redirecting to:', state.redirectTo);
-      // Use window.location.href with basePath for reliable redirect
-      const basePath = '/xhs-admin';
-      window.location.href = basePath + state.redirectTo;
-    }
-  }, [state]);
 
   return (
     <form action={formAction} className="mt-8 space-y-6">

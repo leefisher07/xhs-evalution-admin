@@ -1,13 +1,12 @@
 'use server';
 
+import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { DEFAULT_ADMIN_EMAIL, DEFAULT_ADMIN_PASSWORD } from '@/lib/constants/auth';
 import { ADMIN_SESSION_COOKIE, ADMIN_SESSION_MAX_AGE, createSessionToken } from '@/lib/auth/session';
 
 export type LoginState = {
   error?: string;
-  success?: boolean;
-  redirectTo?: string;
 };
 
 export async function loginAction(
@@ -44,9 +43,6 @@ export async function loginAction(
     path: '/'
   });
 
-  console.log('[Login Action] Cookie set successfully, returning success');
-  return {
-    success: true,
-    redirectTo
-  };
+  console.log('[Login Action] Cookie set successfully, redirecting to:', redirectTo);
+  redirect(redirectTo);
 }
