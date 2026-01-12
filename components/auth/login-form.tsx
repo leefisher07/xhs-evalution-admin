@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useFormState, useFormStatus } from 'react-dom';
 import { useSearchParams } from 'next/navigation';
 import { loginAction, type LoginState } from '@/app/(auth)/login/actions';
@@ -18,6 +20,7 @@ function SubmitButton() {
 }
 
 export function LoginForm() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('redirectTo') || '/dashboard';
 
@@ -25,6 +28,15 @@ export function LoginForm() {
     LoginState | undefined,
     (payload: FormData) => void
   ];
+
+  // Handle client-side redirect on successful login
+  useEffect(() => {
+    if (state?.success && state?.redirectTo) {
+      console.log('[LoginForm] Login successful, redirecting to:', state.redirectTo);
+      // Use window.location for a full page reload to ensure cookies are properly set
+      window.location.href = state.redirectTo;
+    }
+  }, [state]);
 
   return (
     <form action={formAction} className="mt-8 space-y-6">
