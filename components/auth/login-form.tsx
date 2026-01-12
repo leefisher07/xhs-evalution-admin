@@ -33,10 +33,14 @@ export function LoginForm() {
   useEffect(() => {
     if (state?.success && state?.redirectTo) {
       console.log('[LoginForm] Login successful, redirecting to:', state.redirectTo);
-      // Use window.location for a full page reload to ensure cookies are properly set
-      window.location.href = state.redirectTo;
+      // Use router.push to handle basePath automatically, then refresh to ensure cookies are set
+      router.push(state.redirectTo);
+      // Force a hard refresh after navigation to ensure cookies are properly applied
+      setTimeout(() => {
+        router.refresh();
+      }, 100);
     }
-  }, [state]);
+  }, [state, router]);
 
   return (
     <form action={formAction} className="mt-8 space-y-6">
