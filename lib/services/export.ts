@@ -17,6 +17,11 @@ export type ExportOptions = ExportPayload & {
   operator: string;
 };
 
+// Helper function to convert Date objects to ISO strings
+function toISOString(value: string | Date): string {
+  return value instanceof Date ? value.toISOString() : value;
+}
+
 const CORE_COLUMNS = [
   { header: '验证码', key: 'code', width: 26 },
   { header: '状态', key: 'status', width: 10 },
@@ -71,8 +76,8 @@ export async function buildCodesWorkbook(options: ExportOptions) {
   const result = await pool.query<AccessCode>(query, params);
   const enriched = (result.rows ?? []).map((record) => ({
     ...record,
-    expires_at: record.expires_at instanceof Date ? record.expires_at.toISOString() : record.expires_at,
-    created_at: record.created_at instanceof Date ? record.created_at.toISOString() : record.created_at,
+    expires_at: toISOString(record.expires_at as any),
+    created_at: toISOString(record.created_at as any),
     status: deriveCodeStatus(record)
   }));
 

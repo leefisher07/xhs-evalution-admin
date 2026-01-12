@@ -11,6 +11,11 @@ type EnrichedCode = AccessCode & {
   mode: 'random' | 'custom';
 };
 
+// Helper function to convert Date objects to ISO strings
+function toISOString(value: string | Date): string {
+  return value instanceof Date ? value.toISOString() : value;
+}
+
 /**
  * 获取仪表盘数据（统计、趋势、最近记录等）
  */
@@ -28,8 +33,8 @@ export async function fetchDashboardData(): Promise<DashboardPayload> {
   const result = await pool.query<AccessCode>(query);
   const rows = (result.rows ?? []).map(row => ({
     ...row,
-    expires_at: row.expires_at instanceof Date ? row.expires_at.toISOString() : row.expires_at,
-    created_at: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at
+    expires_at: toISOString(row.expires_at as any),
+    created_at: toISOString(row.created_at as any)
   }));
   const groupedByCreatedAt = rows.reduce<Record<string, AccessCode[]>>((acc, record) => {
     const key = record.created_at;

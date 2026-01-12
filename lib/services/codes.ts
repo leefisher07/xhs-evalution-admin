@@ -15,6 +15,11 @@ import type {
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_STATUS_FILTER_FETCH = 1000;
 
+// Helper function to convert Date objects to ISO strings
+function toISOString(value: string | Date): string {
+  return value instanceof Date ? value.toISOString() : value;
+}
+
 export function maskHash(hash: string) {
   return `${hash.slice(0, 3)}****${hash.slice(-3)}`;
 }
@@ -79,8 +84,8 @@ export async function listCodes(filters: CodeFilters = {}): Promise<CodeListResp
     const result = await pool.query<AccessCode>(query, params);
     const normalizedRows = result.rows.map(row => ({
       ...row,
-      expires_at: row.expires_at instanceof Date ? row.expires_at.toISOString() : row.expires_at,
-      created_at: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at
+      expires_at: toISOString(row.expires_at as any),
+      created_at: toISOString(row.created_at as any)
     }));
     const rows = normalizedRows.map(mapToUi).filter((code) => code.status === filters.status);
     const sliced = rows.slice(offset, offset + pageSize);
@@ -106,8 +111,8 @@ export async function listCodes(filters: CodeFilters = {}): Promise<CodeListResp
 
   const normalizedRows = dataResult.rows.map(row => ({
     ...row,
-    expires_at: row.expires_at instanceof Date ? row.expires_at.toISOString() : row.expires_at,
-    created_at: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at
+    expires_at: toISOString(row.expires_at as any),
+    created_at: toISOString(row.created_at as any)
   }));
   const items = normalizedRows.map(mapToUi);
 
@@ -142,8 +147,7 @@ export async function createCode(payload: CreateCodeInput): Promise<CreateCodeRe
     `;
     const result = await pool.query(query, [codeHash, plain, expiresAtISO, maxUses, description]);
     const row = result.rows[0];
-    const normalizedCreatedAt = row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at;
-    return { ids: [row.id], plainCodes: [plain], batchCreatedAt: normalizedCreatedAt };
+    return { ids: [row.id], plainCodes: [plain], batchCreatedAt: toISOString(row.created_at as any) };
   }
 
   const quantity = Math.min(BULK_GENERATION_LIMIT, Math.max(1, payload.quantity ?? 1));
@@ -173,14 +177,14 @@ export async function createCode(payload: CreateCodeInput): Promise<CreateCodeRe
 
   const result = await pool.query(query, params);
   const firstRow = result.rows[0];
-  const normalizedCreatedAt = firstRow?.created_at instanceof Date
-    ? firstRow.created_at.toISOString()
-    : firstRow?.created_at ?? new Date().toISOString();
+  const batchCreatedAt = firstRow
+    ? toISOString(firstRow.created_at as any)
+    : new Date().toISOString();
 
   return {
     ids: result.rows.map((row) => row.id),
     plainCodes,
-    batchCreatedAt: normalizedCreatedAt
+    batchCreatedAt
   };
 }
 
@@ -228,8 +232,8 @@ export async function updateCode(id: string, patch: UpdateCodeInput) {
   const row = result.rows[0];
   const normalizedRow = {
     ...row,
-    expires_at: row.expires_at instanceof Date ? row.expires_at.toISOString() : row.expires_at,
-    created_at: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at
+    expires_at: toISOString(row.expires_at as any),
+    created_at: toISOString(row.created_at as any)
   };
   return mapToUi(normalizedRow);
 }
@@ -261,10 +265,7 @@ export async function listRecentBatches(limit = 20): Promise<CodeBatchSummary[]>
   const groups = new Map<string, CodeBatchSummary>();
   result.rows.forEach((record) => {
     if (!record?.created_at) return;
-    const normalizedCreatedAt = record.created_at instanceof Date
-      ? record.created_at.toISOString()
-      : record.created_at;
-    const key = normalizedCreatedAt;
+    const key = toISOString(record.created_at as any);
     const existing = groups.get(key);
     if (existing) {
       existing.count += 1;
