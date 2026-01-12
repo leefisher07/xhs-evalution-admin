@@ -133,6 +133,11 @@ export function CodeFormDialog({
           description: description.trim() || undefined
         });
 
+        if (!result) {
+          setError('服务器响应异常，请刷新页面后重试');
+          return;
+        }
+
         if (result.success) {
           setSuccessMessage(result.message || '更新成功');
           setTimeout(() => {
@@ -152,6 +157,11 @@ export function CodeFormDialog({
           maxUses: isUnlimited ? UNLIMITED_MAX_USES : (maxUses as number),
           description: description.trim() || undefined
         });
+
+        if (!result) {
+          setError('服务器响应异常，请刷新页面后重试');
+          return;
+        }
 
         if (result.success) {
           setSuccessMessage(result.message || '创建成功');
