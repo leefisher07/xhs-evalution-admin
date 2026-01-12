@@ -1,6 +1,7 @@
 'use client';
 
 import { useFormState, useFormStatus } from 'react-dom';
+import { useSearchParams } from 'next/navigation';
 import { loginAction, type LoginState } from '@/app/(auth)/login/actions';
 
 function SubmitButton() {
@@ -17,6 +18,9 @@ function SubmitButton() {
 }
 
 export function LoginForm() {
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get('redirectTo') || '/dashboard';
+
   const [state, formAction] = useFormState(loginAction as any, undefined) as unknown as [
     LoginState | undefined,
     (payload: FormData) => void
@@ -24,6 +28,7 @@ export function LoginForm() {
 
   return (
     <form action={formAction} className="mt-8 space-y-6">
+      <input type="hidden" name="redirectTo" value={redirectTo} />
       <div className="space-y-4 rounded-md shadow-sm">
         <div>
           <label htmlFor="email" className="sr-only">
