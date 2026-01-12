@@ -139,13 +139,13 @@ export function CodeFormDialog({
         }
 
         if (result.success) {
-          setSuccessMessage(result.message || '更新成功');
+          setSuccessMessage('message' in result ? result.message : '更新成功');
           setTimeout(() => {
             onSuccess();
             handleClose();
           }, 1000);
         } else {
-          setError(result.error || '更新失败');
+          setError('error' in result ? result.error : '更新失败');
         }
       } else {
         // 创建模式
@@ -164,13 +164,13 @@ export function CodeFormDialog({
         }
 
         if (result.success) {
-          setSuccessMessage(result.message || '创建成功');
+          setSuccessMessage('message' in result ? result.message : '创建成功');
           setTimeout(() => {
             onSuccess();
             handleClose();
           }, 1000);
         } else {
-          setError(result.error || '创建失败');
+          setError('error' in result ? result.error : '创建失败');
         }
       }
     } catch (err: any) {
